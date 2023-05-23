@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stardom Pong</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: black;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      color: #fff;
+    }
+
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 36px;
+      color: #fff;
+      text-align: center;
+      display: none;
+    }
+
+    body {
+    background: rgb(7,59,8);
+    background-image: url(https://raw.githubusercontent.com/jordan-trempert/media/main/stars.png);
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    font-family: 'Upheaval';
+    background-repeat: repeat;
+    animation: scroll 10s linear infinite;
+
+}
+
+@keyframes scroll {
+    0% {
+      background-position: 0 0;
+    }
+    100% {
+      background-position: 0 -2000px;
+    }
+  }
+
+
+  @font-face {
+    font-family: 'Upheaval';
+    src: url('upheavtt.ttf'); /* Replace with the actual file name and extension */
+  }
+  
+  body {
+    font-family: 'Upheaval', sans-serif; /* Use the 'Upheaval' font for the body */
+  }
+
+  </style>
+</head>
+<body>
+  <canvas id="pongCanvas"></canvas>
+  <div id="score">0 : 0</div>
+  <div id="message"></div>
+
+  <script>
+    // Get canvas element and 2D context
+    const canvas = document.getElementById("pongCanvas");
+    const context = canvas.getContext("2d");
+
+    // Set canvas dimensions to match the window size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Load assets
+    const playerImage = new Image();
+    playerImage.src = "player.png";
+
+    const aiImage = new Image();
+    aiImage.src = "ai.png";
+
+    const ballImage = new Image();
+    ballImage.src = "ball.png";
+
+    // Set up paddle and ball properties
+    const paddleWidth = 10;
+    const paddleHeight = 80;
+    const playerSpeed = 5; // Adjust player paddle speed as needed
+    const aiSpeed = 3; // Adjust AI paddle speed as needed
+    let playerY = canvas.height / 2 - paddleHeight / 2;
+    let aiY = canvas.height / 2 - paddleHeight / 2;
+
+    const ballSize = 10;
+    let ballX = canvas.width / 2 - ballSize / 2;
+    let ballY = canvas.height / 2 - ballSize / 2;
+    const ballSpeed = 4;
+
+    let ballSpeedX = Math.random() > 0.5 ? ballSpeed : -ballSpeed;
+    let ballSpeedY = Math.random() > 0.5 ? ballSpeed : -ballSpeed;
+
+    let playerScore = 0;
+    let aiScore = 0;
+
+    // Track key states
+    const keys = {};
+
+    // Update the canvas
+    function update() {
+      // Check if a player has already won
+      if (playerScore === 11 || aiScore === 11) {
+        return;
+      }
+
+      movePaddles();
+      moveBall();
+      draw();
+    }
+
+    // Move the paddles
+    function movePaddles() {
+      // Move player paddle
+      if ((keys["ArrowUp"] || keys["KeyW"]) && playerY > 0) {
+        playerY -= playerSpeed;
+      } else if ((keys["ArrowDown"] || keys["KeyS"]) && playerY < canvas.height - paddleHeight) {
+        playerY += playerSpeed;
+      }
+
+      // Move AI paddle
+      if (ballX > canvas.width / 2) {
+        const aiCenterY = aiY + paddleHeight / 2;
+        if (aiCenterY < ballY + ballSize / 2 - aiSpeed) {
+          aiY += aiSpeed;
+        } else if (aiCenterY > ballY + ballSize / 2 + aiSpeed) {
+          aiY -= aiSpeed;
+        }
+      }
+    }
+
+    // Move the ball
+    function moveBall() {
+      ballX += ballSpeedX;
+      ballY += ballSpeedY;
+
+      // Collision detection with paddles
+      if (
+        ballX <= paddleWidth &&
+        ballY + ballSize >= playerY &&
+        ballY <= playerY + paddleHeight
+      ) {
+        ballSpeedX *= -1;
+        adjustBallTrajectory(playerY);
+      }
+
+      if (
+        ballX + ballSize >= canvas.width - paddleWidth &&
+        ballY + ballSize >= aiY &&
+        ballY <= aiY + paddleHeight
+      ) {
+        ballSpeedX *= -1;
+        adjustBallTrajectory(aiY);
+      }
+
+      // Collision detection with walls
+      if (ballY <= 0 || ballY + ballSize >= canvas.height) {
+        ballSpeedY *= -1;
+      }
+
+      // Check if player missed the ball
+      if (ballX <= 0) {
+        resetBall();
+        aiScore++;
+        updateScore();
+      }
+
+      // Check if AI missed the ball
+      if (ballX + ballSize >= canvas.width) {
+        resetBall();
+        playerScore++;
+        updateScore();
+      }
+    }
+
+    // Reset ball position
+    function resetBall() {
+      ballX = canvas.width / 2 - ballSize / 2;
+      ballY = canvas.height / 2 - ballSize / 2;
+      ballSpeedX = Math.random() > 0.5 ? ballSpeed : -ballSpeed;
+      ballSpeedY = Math.random() > 0.5 ? ballSpeed : -ballSpeed;
+    }
+
+    // Adjust ball trajectory based on paddle hit position
+    function adjustBallTrajectory(paddleY) {
+      const relativeIntersectY = paddleY + paddleHeight / 2 - ballY;
+      const normalizedIntersectY = relativeIntersectY / (paddleHeight / 2);
+      const bounceAngle = normalizedIntersectY * Math.PI / 4;
+      ballSpeedY = Math.sin(bounceAngle) * Math.abs(ballSpeedX);
+
+      // Ensure minimum vertical speed to prevent ball getting stuck
+      if (Math.abs(ballSpeedY) < 1) {
+        ballSpeedY = Math.sign(ballSpeedY) * 1;
+      }
+    }
+
+    // Update the score
+    function updateScore() {
+      const scoreElement = document.getElementById("score");
+      scoreElement.textContent = `${playerScore} : ${aiScore}`;
+
+      // Check if a player won
+      if (playerScore === 11) {
+        showResultMessage("Player Won! Refresh to Replay");
+      } else if (aiScore === 11) {
+        showResultMessage("AI Won! Refresh to Replay");
+      }
+    }
+
+    // Show the result message
+    function showResultMessage(message) {
+      const messageElement = document.getElementById("message");
+      messageElement.textContent = message;
+      messageElement.style.display = "block";
+    }
+
+    // Draw the paddles and ball
+    function draw() {
+      // Clear canvas
+      context.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw center line
+      context.beginPath();
+      context.setLineDash([5, 5]);
+      context.moveTo(canvas.width / 2, 0);
+      context.lineTo(canvas.width / 2, canvas.height);
+      context.strokeStyle = "#fff";
+      context.lineWidth = 2;
+      context.stroke();
+
+      // Draw player paddle
+      context.drawImage(playerImage, 0, playerY, paddleWidth, paddleHeight);
+
+      // Draw AI paddle
+      context.drawImage(aiImage, canvas.width - paddleWidth, aiY, paddleWidth, paddleHeight);
+
+      // Draw ball
+      context.drawImage(ballImage, ballX, ballY, ballSize, ballSize);
+    }
+
+    // Handle keydown event
+    function handleKeyDown(event) {
+      keys[event.code] = true;
+    }
+
+    // Handle keyup event
+    function handleKeyUp(event) {
+      keys[event.code] = false;
+    }
+
+    // Add event listeners for keydown and keyup events
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+
+    // Game loop
+    function gameLoop() {
+      update();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start the game
+    gameLoop();
+  </script>
+</body>
+</html>
